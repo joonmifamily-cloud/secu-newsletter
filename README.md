@@ -6,7 +6,7 @@
 
 - **Claude API** (web search) — 뉴스 수집 및 요약
 - **GitHub Actions** — 매일 자동 실행 (cron)
-- **Gmail SMTP** — 이메일 발송
+- **Gmail API** (`users.messages.send`) — OAuth 2.0 오프라인 권한으로 이메일 발송
 
 ## 카테고리
 
@@ -23,11 +23,13 @@
 
 - https://console.anthropic.com 에서 API 키 생성
 
-### 2. Gmail 앱 비밀번호 발급
+### 2. Gmail API OAuth 설정
 
-1. Google 계정 → 보안 → 2단계 인증 활성화
-2. Google 계정 → 보안 → 앱 비밀번호 → "메일" 선택 → 생성
-3. 16자리 비밀번호 복사
+1. Google Cloud 프로젝트에서 Gmail API를 활성화합니다.
+2. OAuth 동의 화면을 구성하고 `joonmi.family@gmail.com`을 테스트 사용자로 추가합니다.
+3. 데스크톱 앱 OAuth 클라이언트를 생성합니다.
+4. `https://www.googleapis.com/auth/gmail.send` 범위로 오프라인 동의를 받아 refresh token을 생성합니다.
+5. client id, client secret, refresh token은 GitHub Actions Secrets에만 저장합니다.
 
 ### 3. GitHub Secrets 등록
 
@@ -37,7 +39,9 @@
 |---|---|
 | `ANTHROPIC_API_KEY` | Anthropic API 키 |
 | `GMAIL_USER` | Gmail 주소 (예: user@gmail.com) |
-| `GMAIL_APP_PASSWORD` | Gmail 앱 비밀번호 (16자리) |
+| `GMAIL_CLIENT_ID` | Google OAuth 클라이언트 ID |
+| `GMAIL_CLIENT_SECRET` | Google OAuth 클라이언트 보안 비밀 |
+| `GMAIL_REFRESH_TOKEN` | `gmail.send` 범위의 오프라인 refresh token |
 | `TO_EMAILS` | 수신자 이메일 (쉼표로 구분, 예: `a@x.com,b@y.com`) |
 
 ### 4. 저장소 Push
@@ -63,7 +67,9 @@ pip install -r requirements.txt
 
 export ANTHROPIC_API_KEY="sk-..."
 export GMAIL_USER="your@gmail.com"
-export GMAIL_APP_PASSWORD="xxxx xxxx xxxx xxxx"
+export GMAIL_CLIENT_ID="...apps.googleusercontent.com"
+export GMAIL_CLIENT_SECRET="..."
+export GMAIL_REFRESH_TOKEN="..."
 export TO_EMAILS="recipient@example.com"
 
 python send_newsletter.py

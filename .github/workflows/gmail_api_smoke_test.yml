@@ -1,0 +1,26 @@
+name: Gmail API Smoke Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  send-smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Send Gmail API smoke test
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          TO_EMAILS: ${{ secrets.TO_EMAILS }}
+        run: python send_gmail_api_smoke_test.py

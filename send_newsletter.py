@@ -1,12 +1,12 @@
 import anthropic
-import smtplib
 import os
 import json
 import re
 import html as html_mod
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
+
+from gmail_api import GmailApiClient, GmailOAuthCredentials
 
 # --- Configuration ---
 KST = timezone(timedelta(hours=9))
@@ -18,7 +18,9 @@ DAY_KR = DAY_NAMES[TODAY.weekday()]
 MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 GMAIL_USER = os.environ["GMAIL_USER"]
-GMAIL_APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
+GMAIL_CLIENT_ID = os.environ["GMAIL_CLIENT_ID"]
+GMAIL_CLIENT_SECRET = os.environ["GMAIL_CLIENT_SECRET"]
+GMAIL_REFRESH_TOKEN = os.environ["GMAIL_REFRESH_TOKEN"]
 TO_EMAILS = [e.strip() for e in os.environ["TO_EMAILS"].split(",")]
 
 SECTIONS = [
@@ -224,19 +226,31 @@ def build_html(data):
 
 
 def send_email(html_content):
-    """Gmail SMTP로 뉴스레터 발송"""
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"🛡️ Daily Security Briefing — {DATE_STR} ({DAY_KR})"
-    msg["From"] = GMAIL_USER
-    msg["To"] = ", ".join(TO_EMAILS)
+    """Gmail API messages.send로 뉴스레터 발송"""
+    client = GmailApiClient(
+        GmailOAuthCredentials(
+            client_id=GMAIL_CLIENT_ID,
+            client_secret=GMAIL_CLIENT_SECRET,
+            refresh_token=GMAIL_REFRESH_TOKEN,
+        )
+    )
+    subject = f"[데일리 보안 브리핑] {DATE_STR}"
+    message_id = client.send_html(
+        sender=GMAIL_USER,
+        recipients=TO_EMAILS,
+        subject=subject,
+        html_content=html_content,
+        plain_content=(
+            f"{subject}\n\n"
+            "HTML을 지원하는 메일 클라이언트에서 카드형 뉴스레터를 확인해 주세요."
+        ),
+    )
 
-    msg.attach(MIMEText(html_content, "html", "utf-8"))
-
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-        server.sendmail(GMAIL_USER, TO_EMAILS, msg.as_string())
-
-    print(f"Newsletter sent to {len(TO_EMAILS)} recipient(s)")
+    print(
+        f"Gmail API send confirmed: message_id={message_id}, "
+        f"recipients={len(TO_EMAILS)}"
+    )
+    return message_id
 
 
 def main():
@@ -249,10 +263,16 @@ def main():
     print("Building HTML email...")
     html_content = build_html(data)
 
-    print("Sending email...")
-    send_email(html_content)
+    artifact_dir = Path("artifacts")
+    artifact_dir.mkdir(exist_ok=True)
+    artifact_path = artifact_dir / f"security_newsletter_{DATE_STR}.html"
+    artifact_path.write_text(html_content, encoding="utf-8")
+    print(f"HTML artifact written: {artifact_path}")
 
-    print("Done!")
+    print("Sending email...")
+    message_id = send_email(html_content)
+
+    print(f"Done: Gmail message id {message_id}")
 
 
 if __name__ == "__main__":

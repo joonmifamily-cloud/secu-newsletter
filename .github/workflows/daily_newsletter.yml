@@ -2,13 +2,21 @@ name: Daily Security Newsletter
 
 on:
   schedule:
-    # 매일 UTC 22:00 = KST 07:00
-    - cron: "0 22 * * *"
+    # 매일 07:00 KST에 수집·분석을 시작
+    - cron: "0 7 * * *"
+      timezone: "Asia/Seoul"
   workflow_dispatch: # 수동 실행 가능
+
+concurrency:
+  group: daily-security-newsletter
+  cancel-in-progress: false
 
 jobs:
   send-newsletter:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -23,7 +31,18 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
           TO_EMAILS: ${{ secrets.TO_EMAILS }}
           CLAUDE_MODEL: "claude-sonnet-4-6"
         run: python send_newsletter.py
+
+      - name: Upload generated newsletter
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-newsletter-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 30
